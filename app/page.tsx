@@ -1,4 +1,5 @@
 import Image from "next/image";
+import SupabaseTestComponent from "./supabase-test";
 
 export default function Home() {
   return (
@@ -12,6 +13,12 @@ export default function Home() {
           height={38}
           priority
         />
+        
+        {/* Supabase Connection Test */}
+        <div className="w-full max-w-lg my-4">
+          <SupabaseTestComponent />
+        </div>
+
         <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
           <li className="mb-2 tracking-[-.01em]">
             Get started by editing{" "}
