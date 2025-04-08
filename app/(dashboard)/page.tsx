@@ -1,111 +1,69 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { levelService } from '@/lib/services/levelService';
+import { LevelMap, LevelWithProgress } from '@/components/level-map/level-map';
+import { ProgressProvider } from '@/components/level-map/progress-provider';
+import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { progressService } from '@/lib/services/progressService';
 
-export default function DashboardHomePage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Карта уровней</h1>
-        <p className="text-muted-foreground mt-2">
-          Исследуйте уровни обучения и отслеживайте ваш прогресс
-        </p>
-      </div>
+// Временные мокапы тестовых данных для демонстрации
+const getTempVideoCounts = (levelId: string) => {
+  const levelNumber = parseInt(levelId.slice(-1), 10) || 1;
+  return {
+    total: 5,
+    completed: levelNumber === 1 ? 5 : levelNumber === 2 ? 3 : 0
+  };
+};
+
+const getTempLevelStatus = (levelId: string): 'available' | 'in_progress' | 'completed' | 'locked' => {
+  const levelNumber = parseInt(levelId.slice(-1), 10) || 1;
+  
+  if (levelNumber === 1) return 'completed';
+  if (levelNumber === 2) return 'in_progress';
+  if (levelNumber === 3) return 'available';
+  return 'locked';
+};
+
+export default async function DashboardHomePage() {
+  // Получаем Supabase клиент и текущего пользователя
+  const supabase = createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  // Получаем все уровни из базы данных
+  const levels = await levelService.getAllLevels();
+  
+  // Если пользователь авторизован, получаем данные о прогрессе
+  let levelsWithProgress: LevelWithProgress[] = [];
+  
+  if (user) {
+    // Используем сервис прогресса для получения данных
+    levelsWithProgress = await progressService.prepareLevelsWithProgress(levels, user.id);
+  } else {
+    // Если пользователь не авторизован, используем моковые данные
+    levelsWithProgress = levels.map((level) => {
+      const levelNumber = parseInt(level.id.slice(-1), 10) || 1;
+      const status = levelNumber === 1 ? 'available' : 'locked';
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Level 1 */}
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="pb-2">
-            <CardTitle>Уровень 1</CardTitle>
-            <CardDescription>Основы бизнеса</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <div className="text-sm">
-                <p>Прогресс: 100%</p>
-                <p>5/5 видео</p>
-              </div>
-              <div className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-3 py-1 rounded-full text-xs font-medium">
-                Завершено
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Level 2 */}
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="pb-2">
-            <CardTitle>Уровень 2</CardTitle>
-            <CardDescription>Маркетинг и продажи</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <div className="text-sm">
-                <p>Прогресс: 60%</p>
-                <p>3/5 видео</p>
-              </div>
-              <div className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full text-xs font-medium">
-                В процессе
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Level 3 */}
-        <Card className="border-l-4 border-l-gray-300 dark:border-l-gray-700">
-          <CardHeader className="pb-2">
-            <CardTitle>Уровень 3</CardTitle>
-            <CardDescription>Финансы и инвестиции</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <div className="text-sm">
-                <p>Прогресс: 0%</p>
-                <p>0/5 видео</p>
-              </div>
-              <div className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-full text-xs font-medium">
-                Заблокировано
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Level 4 */}
-        <Card className="border-l-4 border-l-gray-300 dark:border-l-gray-700">
-          <CardHeader className="pb-2">
-            <CardTitle>Уровень 4</CardTitle>
-            <CardDescription>Управление командой</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <div className="text-sm">
-                <p>Прогресс: 0%</p>
-                <p>0/5 видео</p>
-              </div>
-              <div className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-full text-xs font-medium">
-                Заблокировано
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Level 5 */}
-        <Card className="border-l-4 border-l-gray-300 dark:border-l-gray-700">
-          <CardHeader className="pb-2">
-            <CardTitle>Уровень 5</CardTitle>
-            <CardDescription>Масштабирование бизнеса</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <div className="text-sm">
-                <p>Прогресс: 0%</p>
-                <p>0/5 видео</p>
-              </div>
-              <div className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-full text-xs font-medium">
-                Заблокировано
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+      return {
+        ...level,
+        progress: 0,
+        status: status as 'available' | 'locked',
+        videosCompleted: 0,
+        totalVideos: 5
+      };
+    });
+  }
+  
+  // Если пользователь авторизован, оборачиваем в ProgressProvider для обновлений в реальном времени
+  if (user) {
+    return (
+      <ProgressProvider 
+        initialLevelsWithProgress={levelsWithProgress} 
+        userId={user.id}
+      >
+        <LevelMap />
+      </ProgressProvider>
+    );
+  }
+  
+  // Если пользователь не авторизован, просто отображаем карту без обновлений в реальном времени
+  return <LevelMap levels={levelsWithProgress} />;
 } 
