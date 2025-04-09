@@ -115,13 +115,15 @@ const getVideosForLevel = (levelId: string, levelIndex: number) => [
 ];
 
 // Тестовые данные для тестовых вопросов
-const getQuestionsForLevel = (levelId: string) => [
+const getQuestionsForLevel = (levelId: string, videos: any[]) => [
   {
     question: 'Какая из перечисленных стратегий наиболее эффективна для начинающего бизнеса?',
     options: ['Максимальные инвестиции в рекламу', 'Найм большого количества сотрудников', 'Фокус на MVP и изучение потребностей рынка', 'Игнорирование конкурентов'],
     correct_option: 2, // 0-индексированный (3-й вариант)
     level_id: levelId,
+    video_id: videos[0].id,
     order_index: 1,
+    type: 'single_choice',
     explanation: 'Для начинающего бизнеса важно сначала создать минимально жизнеспособный продукт (MVP) и изучить реальные потребности целевой аудитории.'
   },
   {
@@ -129,7 +131,9 @@ const getQuestionsForLevel = (levelId: string) => [
     options: ['Customer Acquisition Cost (Стоимость привлечения клиента)', 'Customer Average Check (Средний чек клиента)', 'Corporate Annual Conference (Годовая корпоративная конференция)', 'Content Analysis Certificate (Сертификат анализа контента)'],
     correct_option: 0,
     level_id: levelId,
+    video_id: videos[1].id,
     order_index: 2,
+    type: 'single_choice',
     explanation: 'CAC (Customer Acquisition Cost) — это стоимость привлечения нового клиента, важный показатель для оценки эффективности маркетинговых кампаний.'
   },
   {
@@ -137,8 +141,30 @@ const getQuestionsForLevel = (levelId: string) => [
     options: ['Ценообразование на основе затрат', 'Пенетрационное ценообразование', 'Престижное ценообразование', 'Ценообразование на основе конкуренции'],
     correct_option: 2,
     level_id: levelId,
+    video_id: videos[2].id,
     order_index: 3,
+    type: 'single_choice',
     explanation: 'Для инновационных продуктов часто используется престижное ценообразование, чтобы подчеркнуть уникальность и премиальное качество продукта.'
+  },
+  {
+    question: 'Выберите все верные характеристики успешного бизнес-плана:',
+    options: ['Содержит детальный финансовый анализ', 'Описывает целевую аудиторию', 'Фокусируется только на краткосрочных целях', 'Включает анализ конкурентов'],
+    correct_option: [0, 1, 3], // Множественный выбор
+    level_id: levelId,
+    video_id: videos[3].id,
+    order_index: 4,
+    type: 'multiple_choice',
+    explanation: 'Успешный бизнес-план должен содержать детальный финансовый анализ, описание целевой аудитории и анализ конкурентов. Фокус только на краткосрочных целях - неправильный подход.'
+  },
+  {
+    question: 'Напишите метрику, которая рассчитывается как соотношение затрат на привлечение клиента к его ценности за время сотрудничества:',
+    options: ['LTV/CAC'],
+    correct_option: 0,
+    level_id: levelId,
+    video_id: videos[4].id,
+    order_index: 5,
+    type: 'text_input',
+    explanation: 'LTV/CAC - это соотношение пожизненной ценности клиента (Lifetime Value) к стоимости его привлечения (Customer Acquisition Cost). Идеальным считается соотношение 3:1 и выше.'
   }
 ];
 
@@ -219,7 +245,7 @@ async function seedTestData() {
       console.log(`Добавлено ${videosData.length} видео для уровня ${levelsData[i].title}`);
       
       // Добавляем вопросы
-      const questions = getQuestionsForLevel(levelId);
+      const questions = getQuestionsForLevel(levelId, videosData);
       const { data: questionsData, error: questionsError } = await supabase
         .from('quiz_questions')
         .insert(questions)

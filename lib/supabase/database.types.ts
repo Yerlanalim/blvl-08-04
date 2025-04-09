@@ -155,7 +155,7 @@ export type Database = {
       }
       quiz_questions: {
         Row: {
-          correct_option: number
+          correct_option: Json
           created_at: string
           explanation: string | null
           id: string
@@ -164,9 +164,11 @@ export type Database = {
           order_index: number
           question: string
           updated_at: string
+          video_id: string | null
+          type: string
         }
         Insert: {
-          correct_option: number
+          correct_option: Json
           created_at?: string
           explanation?: string | null
           id?: string
@@ -175,9 +177,11 @@ export type Database = {
           order_index: number
           question: string
           updated_at?: string
+          video_id?: string | null
+          type?: string
         }
         Update: {
-          correct_option?: number
+          correct_option?: Json
           created_at?: string
           explanation?: string | null
           id?: string
@@ -186,6 +190,8 @@ export type Database = {
           order_index?: number
           question?: string
           updated_at?: string
+          video_id?: string | null
+          type?: string
         }
         Relationships: [
           {
@@ -195,6 +201,13 @@ export type Database = {
             referencedRelation: "levels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "quiz_questions_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          }
         ]
       }
       test_connection: {
