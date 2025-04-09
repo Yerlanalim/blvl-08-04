@@ -19,7 +19,6 @@ export async function middleware(request: NextRequest) {
     // Paths that require authentication
     const authRequiredPaths = [
       '/dashboard',
-      '/admin',
       '/profile',
     ]
     
@@ -30,8 +29,37 @@ export async function middleware(request: NextRequest) {
       '/forgot-password',
     ]
     
+    // Admin paths that require admin role
+    const adminPaths = [
+      '/admin',
+    ]
+    
     // Check for a specific redirect parameter to handle post-authentication redirects
     const redirectTo = url.searchParams.get('redirectTo') || '/dashboard'
+    
+    // If path requires admin privileges, check for admin role
+    if (path.startsWith('/admin')) {
+      if (!session) {
+        // Not authenticated, redirect to login
+        const returnToPath = encodeURIComponent(request.nextUrl.pathname)
+        return NextResponse.redirect(new URL(`/login?redirectTo=${returnToPath}`, request.url))
+      }
+      
+      // Check if user has admin role
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+      
+      if (error || profile?.role !== 'admin') {
+        // Not admin, redirect to dashboard
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+      
+      // Admin is authenticated and has admin role, continue
+      return response
+    }
     
     // If the path requires authentication and user is not authenticated
     if (authRequiredPaths.some(p => path.startsWith(p)) && !session) {
