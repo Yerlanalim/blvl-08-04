@@ -10,6 +10,7 @@ export type UserProgress = Database['public']['Tables']['user_progress']['Row'];
 export type UserVideoProgress = Database['public']['Tables']['user_video_progress']['Row'];
 export type UserArtifact = Database['public']['Tables']['user_artifacts']['Row'];
 export type ChatMessage = Database['public']['Tables']['chat_messages']['Row'];
+export type FAQ = Database['public']['Tables']['faq']['Row'];
 
 // Insertion types
 export type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
@@ -21,6 +22,7 @@ export type UserProgressInsert = Database['public']['Tables']['user_progress']['
 export type UserVideoProgressInsert = Database['public']['Tables']['user_video_progress']['Insert'];
 export type UserArtifactInsert = Database['public']['Tables']['user_artifacts']['Insert'];
 export type ChatMessageInsert = Database['public']['Tables']['chat_messages']['Insert'];
+export type FAQInsert = Database['public']['Tables']['faq']['Insert'];
 
 // Update types
 export type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
@@ -32,6 +34,7 @@ export type UserProgressUpdate = Database['public']['Tables']['user_progress']['
 export type UserVideoProgressUpdate = Database['public']['Tables']['user_video_progress']['Update'];
 export type UserArtifactUpdate = Database['public']['Tables']['user_artifacts']['Update'];
 export type ChatMessageUpdate = Database['public']['Tables']['chat_messages']['Update'];
+export type FAQUpdate = Database['public']['Tables']['faq']['Update'];
 
 // Enums and constants
 export type LevelStatus = 'draft' | 'published' | 'archived';
@@ -85,6 +88,38 @@ export type Tables = {
       conversation_id?: string
       role?: MessageRole
       content?: string
+    }
+  },
+  faq: {
+    Row: {
+      id: number
+      category: string
+      question: string
+      answer: string
+      order_num: number
+      is_published: boolean
+      created_at: string
+      updated_at: string | null
+    }
+    Insert: {
+      id?: number
+      category: string
+      question: string
+      answer: string
+      order_num?: number
+      is_published?: boolean
+      created_at?: string
+      updated_at?: string | null
+    }
+    Update: {
+      id?: number
+      category?: string
+      question?: string
+      answer?: string
+      order_num?: number
+      is_published?: boolean
+      created_at?: string
+      updated_at?: string | null
     }
   }
   // Add other tables here as they are created
