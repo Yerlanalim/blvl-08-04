@@ -3,7 +3,7 @@
 import { Level } from '@/lib/supabase/types';
 import { LevelCard } from './level-card';
 import { Input } from '@/components/ui/input';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useProgress } from './progress-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { X, Search } from 'lucide-react';
@@ -29,11 +29,30 @@ export function LevelMap({ levels: initialLevels }: LevelMapProps) {
       return useProgress();
     } catch (e) {
       // Если контекст недоступен, просто возвращаем initialLevels
-      return { levelsWithProgress: initialLevels || [], isLoading: false };
+      return { 
+        levelsWithProgress: initialLevels || [], 
+        isLoading: false,
+        newlyUnlockedLevels: new Set(),
+        markLevelSeen: () => {}
+      };
     }
   })();
   
-  const { levelsWithProgress, isLoading } = progressContext;
+  const { 
+    levelsWithProgress, 
+    isLoading, 
+    newlyUnlockedLevels, 
+    markLevelSeen
+  } = progressContext;
+  
+  // Отмечаем все уровни как просмотренные при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      newlyUnlockedLevels.forEach(levelId => {
+        markLevelSeen(levelId);
+      });
+    };
+  }, [newlyUnlockedLevels, markLevelSeen]);
   
   // Используем уровни из контекста прогресса, если они доступны, иначе используем initialLevels
   const levels = useMemo(() => 
@@ -165,6 +184,7 @@ export function LevelMap({ levels: initialLevels }: LevelMapProps) {
                 status={level.status}
                 videosCompleted={level.videosCompleted}
                 totalVideos={level.totalVideos}
+                isNewlyUnlocked={newlyUnlockedLevels.has(level.id)}
               />
             ))}
           </div>

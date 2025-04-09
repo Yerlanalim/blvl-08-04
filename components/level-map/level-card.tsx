@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Lock, Award, TrendingUp, Unlock } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 
 type LevelState = 'available' | 'in_progress' | 'completed' | 'locked';
 
@@ -15,6 +16,7 @@ interface LevelCardProps {
   status?: LevelState;
   videosCompleted?: number;
   totalVideos?: number;
+  isNewlyUnlocked?: boolean;
 }
 
 function LevelCardComponent({
@@ -23,7 +25,23 @@ function LevelCardComponent({
   status = 'locked',
   videosCompleted = 0,
   totalVideos = 0,
+  isNewlyUnlocked = false,
 }: LevelCardProps) {
+  // Добавляем состояние для эффекта подсветки
+  const [isHighlighted, setIsHighlighted] = useState(isNewlyUnlocked);
+  
+  // Автоматически сбрасываем эффект подсветки через 5 секунд
+  useEffect(() => {
+    if (isNewlyUnlocked) {
+      setIsHighlighted(true);
+      const timer = setTimeout(() => {
+        setIsHighlighted(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isNewlyUnlocked]);
+
   // Мемоизируем вычисления стилей для улучшения производительности
   const borderColor = useMemo(() => {
     switch (status) {
@@ -32,12 +50,12 @@ function LevelCardComponent({
       case 'in_progress':
         return 'border-l-blue-500';
       case 'available':
-        return 'border-l-amber-500';
+        return isHighlighted ? 'border-l-amber-400' : 'border-l-amber-500';
       case 'locked':
       default:
         return 'border-l-gray-300 dark:border-l-gray-700';
     }
-  }, [status]);
+  }, [status, isHighlighted]);
 
   // Мемоизируем компонент бейджа статуса для предотвращения ненужных ререндеров
   const statusBadge = useMemo(() => {
@@ -58,9 +76,9 @@ function LevelCardComponent({
         );
       case 'available':
         return (
-          <div className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+          <div className={`${isHighlighted ? 'bg-amber-100 dark:bg-amber-800 animate-pulse' : 'bg-amber-100 dark:bg-amber-900'} text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1`}>
             <Unlock className="w-3 h-3" />
-            <span>Доступен</span>
+            <span>{isHighlighted ? 'Новый!' : 'Доступен'}</span>
           </div>
         );
       case 'locked':
@@ -72,7 +90,7 @@ function LevelCardComponent({
           </div>
         );
     }
-  }, [status]);
+  }, [status, isHighlighted]);
 
   // Мемоизируем контент карточки для предотвращения ненужных ререндеров
   const cardContent = useMemo(() => (
@@ -126,20 +144,38 @@ function LevelCardComponent({
   const cardClasses = useMemo(() => 
     `border-l-4 ${borderColor} transition-all duration-200 ${
       status !== 'locked' ? 'hover:shadow-md cursor-pointer' : 'opacity-80'
-    }`,
-    [borderColor, status]
+    } ${isHighlighted ? 'shadow-lg shadow-amber-200 dark:shadow-amber-900/30' : ''}`,
+    [borderColor, status, isHighlighted]
   );
 
+  // Обертываем в motion.div для анимации, если уровень только что разблокирован
+  const CardWrapper = ({ children }: { children: React.ReactNode }) => {
+    if (isHighlighted) {
+      return (
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0.5 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.5, repeat: 0, ease: "easeOut" }}
+        >
+          {children}
+        </motion.div>
+      );
+    }
+    return <>{children}</>;
+  };
+
   return (
-    <Card className={cardClasses}>
-      {status !== 'locked' ? (
-        <Link href={`/level/${level.id}`} className="block">
-          {cardContent}
-        </Link>
-      ) : (
-        cardContent
-      )}
-    </Card>
+    <CardWrapper>
+      <Card className={cardClasses}>
+        {status !== 'locked' ? (
+          <Link href={`/level/${level.id}`} className="block">
+            {cardContent}
+          </Link>
+        ) : (
+          cardContent
+        )}
+      </Card>
+    </CardWrapper>
   );
 }
 

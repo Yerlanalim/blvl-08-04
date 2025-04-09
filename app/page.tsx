@@ -1,5 +1,6 @@
 import Image from "next/image";
 import SupabaseTestComponent from "./supabase-test";
+import ApiTestComponent from "./api-test";
 
 export default function Home() {
   return (
@@ -17,6 +18,11 @@ export default function Home() {
         {/* Supabase Connection Test */}
         <div className="w-full max-w-lg my-4">
           <SupabaseTestComponent />
+        </div>
+
+        {/* Supabase API Test */}
+        <div className="w-full max-w-lg my-4">
+          <ApiTestComponent />
         </div>
 
         <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">

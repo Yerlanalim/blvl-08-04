@@ -13,6 +13,8 @@ type ProgressContextType = {
     progress: number;
     status: LevelWithProgress['status'];
   } | null;
+  newlyUnlockedLevels: Set<string>;
+  markLevelSeen: (levelId: string) => void;
 };
 
 const ProgressContext = createContext<ProgressContextType | undefined>(undefined);
@@ -33,6 +35,18 @@ export function ProgressProvider({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  
+  // Добавляем отслеживание недавно разблокированных уровней
+  const [newlyUnlockedLevels, setNewlyUnlockedLevels] = useState<Set<string>>(new Set());
+  
+  // Метод для отметки уровня как просмотренного (удаление из списка недавно разблокированных)
+  const markLevelSeen = useCallback((levelId: string) => {
+    setNewlyUnlockedLevels(prev => {
+      const updated = new Set(prev);
+      updated.delete(levelId);
+      return updated;
+    });
+  }, []);
   
   // Создаем мемоизированную мапу для быстрого доступа к прогрессу по ID уровня
   const progressMap = useMemo(() => {
@@ -67,11 +81,34 @@ export function ProgressProvider({
         ...level
       }));
       
+      // Создаем мапу текущих статусов для сравнения
+      const currentStatusMap = new Map<string, string>();
+      levelsWithProgress.forEach(level => {
+        currentStatusMap.set(level.id, level.status);
+      });
+      
       // Получаем обновленные данные с прогрессом
       const updatedLevelsWithProgress = await progressService.prepareLevelsWithProgress(
         levels,
         userId
       );
+      
+      // Проверяем, появились ли новые доступные уровни
+      const newlyUnlocked = new Set(newlyUnlockedLevels);
+      updatedLevelsWithProgress.forEach(level => {
+        // Если уровень изменил статус с locked на available или in_progress,
+        // то считаем его недавно разблокированным
+        const previousStatus = currentStatusMap.get(level.id);
+        if (previousStatus === 'locked' && 
+            (level.status === 'available' || level.status === 'in_progress')) {
+          newlyUnlocked.add(level.id);
+        }
+      });
+      
+      // Обновляем список недавно разблокированных уровней
+      if (newlyUnlocked.size !== newlyUnlockedLevels.size) {
+        setNewlyUnlockedLevels(newlyUnlocked);
+      }
       
       setLevelsWithProgress(updatedLevelsWithProgress);
       setLastUpdated(new Date());
@@ -80,7 +117,7 @@ export function ProgressProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [userId, levelsWithProgress]);
+  }, [userId, levelsWithProgress, newlyUnlockedLevels]);
 
   // Подписываемся на обновления прогресса в реальном времени
   useEffect(() => {
@@ -107,13 +144,51 @@ export function ProgressProvider({
     };
   }, [userId, refreshProgress]);
 
+  // Сохраняем список недавно разблокированных уровней в localStorage
+  useEffect(() => {
+    try {
+      if (newlyUnlockedLevels.size > 0) {
+        localStorage.setItem(
+          `newly_unlocked_${userId}`, 
+          JSON.stringify(Array.from(newlyUnlockedLevels))
+        );
+      }
+    } catch (error) {
+      console.error('Error saving newly unlocked levels to localStorage:', error);
+    }
+  }, [newlyUnlockedLevels, userId]);
+  
+  // Загружаем список недавно разблокированных уровней из localStorage при инициализации
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`newly_unlocked_${userId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setNewlyUnlockedLevels(new Set(parsed));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading newly unlocked levels from localStorage:', error);
+    }
+  }, [userId]);
+
   // Мемоизируем значение контекста
   const contextValue = useMemo(() => ({ 
     levelsWithProgress, 
     isLoading, 
     refreshProgress,
-    getProgressForLevel
-  }), [levelsWithProgress, isLoading, refreshProgress, getProgressForLevel]);
+    getProgressForLevel,
+    newlyUnlockedLevels,
+    markLevelSeen
+  }), [
+    levelsWithProgress, 
+    isLoading, 
+    refreshProgress, 
+    getProgressForLevel, 
+    newlyUnlockedLevels,
+    markLevelSeen
+  ]);
 
   return (
     <ProgressContext.Provider value={contextValue}>

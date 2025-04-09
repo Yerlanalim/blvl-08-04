@@ -10,11 +10,11 @@ import { ChevronLeft, PlayCircle, FileText, List, Check, Lock } from 'lucide-rea
 import Link from 'next/link';
 import Image from 'next/image';
 import { createServerSupabaseClient } from '@/lib/supabase/client';
-import UpdateLevelProgress from '@/app/(dashboard)/level/[levelId]/update-level-progress';
 import VideoSectionClient from './video-section-client';
 import TestSectionClient from './test-section-client';
 import ArtifactSectionClient from './artifact-section-client';
 import { UserVideoProgress, ProgressStatus, UserArtifact, UserProgress } from '@/lib/supabase/types';
+import LevelCompletionStatus from '@/components/level/level-completion-status';
 
 // Расширенный интерфейс прогресса пользователя с дополнительными полями
 interface ExtendedUserProgress extends UserProgress {
@@ -194,6 +194,18 @@ export default async function LevelPage({ params }: LevelPageProps) {
     overallProgress = userProgress.overall_progress || 0;
   }
   
+  // Получаем информацию о выполнении условий завершения уровня
+  let completionConditions = null;
+  if (user) {
+    completionConditions = await progressService.checkLevelCompletionConditions(
+      user.id, 
+      params.levelId
+    );
+  }
+  
+  // Проверяем статус завершения уровня
+  const isLevelCompleted = userProgress?.status === 'completed';
+
   return (
     <div className="space-y-8">
       {/* Заголовок страницы с кнопкой назад */}
@@ -216,15 +228,6 @@ export default async function LevelPage({ params }: LevelPageProps) {
           <Link href="/">
             <Button variant="outline">Вернуться на карту</Button>
           </Link>
-          
-          {user && (
-            <UpdateLevelProgress
-              levelId={params.levelId}
-              userId={user.id}
-              currentProgress={overallProgress}
-              currentStatus={(userProgress?.status as ProgressStatus) || 'not_started'}
-            />
-          )}
         </div>
       </div>
 
@@ -293,6 +296,26 @@ export default async function LevelPage({ params }: LevelPageProps) {
           )}
         </CardContent>
       </Card>
+      
+      {/* Статус завершения уровня */}
+      {user && completionConditions && (
+        <LevelCompletionStatus
+          userId={user.id}
+          levelId={params.levelId}
+          isCompleted={isLevelCompleted}
+          videoProgress={completionConditions.videoProgress}
+          testScore={completionConditions.testScore}
+          artifactsProgress={completionConditions.artifactsProgress}
+          overallProgress={completionConditions.overallProgress}
+          videosCompleted={completionConditions.videosCompleted}
+          testsPassed={completionConditions.testsPassed}
+          artifactsDownloaded={completionConditions.artifactsDownloaded}
+          onComplete={() => {
+            // Обновление страницы после завершения уровня
+            window.location.reload();
+          }}
+        />
+      )}
 
       {/* Секция видео */}
       <div className="space-y-4">

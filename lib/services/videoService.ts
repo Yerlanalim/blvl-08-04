@@ -171,20 +171,70 @@ export const videoService = {
   },
   
   /**
-   * Вычисляет общий прогресс пользователя по уровню на основе просмотра видео
+   * Вычисляет процент выполнения видеоуроков уровня
    * @param userId ID пользователя
    * @param levelId ID уровня
-   * @returns Процент завершенных видео
+   * @returns Процент выполнения от 0 до 100
    */
   calculateLevelVideoProgress: async (userId: string, levelId: string): Promise<number> => {
+    // Получаем все видео уровня
     const videos = await videoService.getLevelVideos(levelId);
-    const videoProgress = await videoService.getUserLevelVideoProgress(userId, levelId);
     
     if (videos.length === 0) {
-      return 0;
+      return 0; // Нет видео в уровне
     }
     
-    const completedVideos = videoProgress.filter(progress => progress.is_completed).length;
-    return Math.round((completedVideos / videos.length) * 100);
+    // Получаем прогресс пользователя по видео
+    const progress = await videoService.getUserLevelVideoProgress(userId, levelId);
+    
+    if (progress.length === 0) {
+      return 0; // Нет прогресса
+    }
+    
+    // Считаем количество завершенных видео
+    const completedCount = progress.filter(p => p.is_completed).length;
+    
+    // Вычисляем процент выполнения
+    return Math.round((completedCount / videos.length) * 100);
+  },
+  
+  /**
+   * Проверяет, просмотрены ли все видео уровня до порогового значения (85%)
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @returns true, если все видео просмотрены достаточно
+   */
+  areAllLevelVideosCompleted: async (userId: string, levelId: string): Promise<boolean> => {
+    // Получаем все видео уровня
+    const videos = await videoService.getLevelVideos(levelId);
+    
+    if (videos.length === 0) {
+      return true; // Нет видео в уровне, условие выполнено автоматически
+    }
+    
+    // Получаем прогресс пользователя по видео
+    const progress = await videoService.getUserLevelVideoProgress(userId, levelId);
+    
+    // Проверяем каждое видео
+    for (const video of videos) {
+      // Находим прогресс для конкретного видео
+      const videoProgress = progress.find(p => p.video_id === video.id);
+      
+      // Если прогресса нет или видео не помечено как завершенное
+      if (!videoProgress || !videoProgress.is_completed) {
+        return false;
+      }
+      
+      // Проверяем, что просмотрено минимум 85% видео
+      if (video.duration) {
+        const watchPercentage = (videoProgress.watched_seconds / video.duration) * 100;
+        if (watchPercentage < 85) {
+          return false;
+        }
+      }
+    }
+    
+    // Все видео просмотрены достаточно
+    return true;
   }
 }; 

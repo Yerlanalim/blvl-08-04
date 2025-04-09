@@ -95,40 +95,46 @@ export const progressService = {
     userProgress: UserProgress[],
     allLevels: { id: string; order_index: number }[]
   ): 'locked' | 'available' | 'in_progress' | 'completed' => {
-    // Находим уровень по его порядковому номеру
-    const currentLevel = allLevels.find(level => level.order_index === levelOrderIndex);
-    if (!currentLevel) return 'locked';
-    
-    // Находим прогресс для текущего уровня
-    const progress = userProgress.find(p => p.level_id === currentLevel.id);
-    
-    // Если уровень первый или предыдущий уровень пройден, он доступен
-    const isFirstLevel = levelOrderIndex === 1;
-    
-    // Находим предыдущий уровень
-    const prevLevel = allLevels.find(level => level.order_index === levelOrderIndex - 1);
-    
-    // Находим прогресс для предыдущего уровня
-    const prevLevelProgress = prevLevel 
-      ? userProgress.find(p => p.level_id === prevLevel.id)
-      : null;
-    
-    // Проверяем, пройден ли предыдущий уровень
-    const isPrevLevelCompleted = !prevLevel || 
-      (prevLevelProgress && prevLevelProgress.status === 'completed');
-    
-    // Если есть запись о прогрессе, возвращаем соответствующий статус
-    if (progress) {
-      return progress.status as 'in_progress' | 'completed';
+    try {
+      // Находим уровень по его порядковому номеру
+      const currentLevel = allLevels.find(level => level.order_index === levelOrderIndex);
+      if (!currentLevel) return 'locked';
+      
+      // Находим прогресс для текущего уровня
+      const progress = userProgress.find(p => p.level_id === currentLevel.id);
+      
+      // Если уровень первый или предыдущий уровень пройден, он доступен
+      const isFirstLevel = levelOrderIndex === 1;
+      
+      // Находим предыдущий уровень
+      const prevLevel = allLevels.find(level => level.order_index === levelOrderIndex - 1);
+      
+      // Находим прогресс для предыдущего уровня
+      const prevLevelProgress = prevLevel 
+        ? userProgress.find(p => p.level_id === prevLevel.id)
+        : null;
+      
+      // Проверяем, пройден ли предыдущий уровень
+      const isPrevLevelCompleted = !prevLevel || 
+        (prevLevelProgress && prevLevelProgress.status === 'completed');
+      
+      // Если есть запись о прогрессе, возвращаем соответствующий статус
+      if (progress) {
+        return progress.status as 'in_progress' | 'completed';
+      }
+      
+      // Если уровень первый или предыдущий пройден, он доступен
+      if (isFirstLevel || isPrevLevelCompleted) {
+        return 'available';
+      }
+      
+      // В остальных случаях уровень заблокирован
+      return 'locked';
+    } catch (error) {
+      console.error('Error calculating level status:', error);
+      // В случае ошибки считаем уровень заблокированным для безопасности
+      return 'locked';
     }
-    
-    // Если уровень первый или предыдущий пройден, он доступен
-    if (isFirstLevel || isPrevLevelCompleted) {
-      return 'available';
-    }
-    
-    // В остальных случаях уровень заблокирован
-    return 'locked';
   },
   
   /**
@@ -149,51 +155,67 @@ export const progressService = {
   ): Promise<UserProgress> => {
     const supabase = createBrowserSupabaseClient();
     
-    // Проверяем, существует ли запись о прогрессе
-    const { data: existingProgress } = await supabase
-      .from('user_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('level_id', levelId)
-      .single();
-    
-    const progressData = {
-      user_id: userId,
-      level_id: levelId,
-      status,
-      completed_percentage: completedPercentage,
-      quiz_score: quizScore
-    };
-    
-    if (existingProgress) {
-      // Обновляем существующую запись
-      const { data, error } = await supabase
-        .from('user_progress')
-        .update(progressData)
-        .eq('id', existingProgress.id)
-        .select()
-        .single();
-        
-      if (error) {
-        console.error(`Error updating progress for level ${levelId}:`, error);
-        throw new Error(`Failed to update progress for level ${levelId}`);
+    try {
+      // Проверяем валидность входных данных
+      if (!userId || !levelId) {
+        throw new Error('Invalid userId or levelId');
       }
       
-      return data;
-    } else {
-      // Создаем новую запись
-      const { data, error } = await supabase
+      // Проверяем, существует ли запись о прогрессе
+      const { data: existingProgress, error: fetchError } = await supabase
         .from('user_progress')
-        .insert(progressData)
-        .select()
+        .select('*')
+        .eq('user_id', userId)
+        .eq('level_id', levelId)
         .single();
-        
-      if (error) {
-        console.error(`Error creating progress for level ${levelId}:`, error);
-        throw new Error(`Failed to create progress for level ${levelId}`);
+      
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error(`Error fetching progress for level ${levelId}:`, fetchError);
+        throw new Error(`Failed to fetch progress for level ${levelId}`);
       }
       
-      return data;
+      const progressData = {
+        user_id: userId,
+        level_id: levelId,
+        status,
+        completed_percentage: completedPercentage,
+        quiz_score: quizScore,
+        last_updated_at: new Date().toISOString()
+      };
+      
+      if (existingProgress) {
+        // Обновляем существующую запись
+        const { data, error } = await supabase
+          .from('user_progress')
+          .update(progressData)
+          .eq('id', existingProgress.id)
+          .select()
+          .single();
+          
+        if (error) {
+          console.error(`Error updating progress for level ${levelId}:`, error);
+          throw new Error(`Failed to update progress for level ${levelId}`);
+        }
+        
+        return data;
+      } else {
+        // Создаем новую запись
+        const { data, error } = await supabase
+          .from('user_progress')
+          .insert(progressData)
+          .select()
+          .single();
+          
+        if (error) {
+          console.error(`Error creating progress for level ${levelId}:`, error);
+          throw new Error(`Failed to create progress for level ${levelId}`);
+        }
+        
+        return data;
+      }
+    } catch (error) {
+      console.error(`Error in updateLevelProgress for level ${levelId}:`, error);
+      throw error; // Прокидываем ошибку выше для обработки вызывающим кодом
     }
   },
   
@@ -422,6 +444,255 @@ export const progressService = {
         console.error(`Error marking artifact ${artifactId} as downloaded:`, error);
         throw new Error(`Failed to mark artifact ${artifactId} as downloaded`);
       }
+    }
+  },
+  
+  /**
+   * Проверяет условия для завершения уровня
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @returns Объект с флагами выполнения условий и общим процентом завершения
+   */
+  checkLevelCompletionConditions: async (userId: string, levelId: string) => {
+    try {
+      // Получаем все данные, необходимые для проверки условий
+      const videoService = (await import('@/lib/services/videoService')).videoService;
+      const testService = (await import('@/lib/services/testService')).testService;
+      const artifactService = (await import('@/lib/services/artifactService')).artifactService;
+      
+      // Проверка видео (минимум 85% каждого видео)
+      const videosCompleted = await videoService.areAllLevelVideosCompleted(userId, levelId);
+      const videoProgress = await videoService.calculateLevelVideoProgress(userId, levelId);
+      
+      // Проверка тестов (минимальный порог - 70% правильных ответов)
+      const testsPassed = await testService.hasPassedLevelTests(userId, levelId);
+      const testScore = await testService.getLevelTestScore(userId, levelId);
+      
+      // Проверка артефактов (скачаны все обязательные)
+      const artifactsDownloaded = await artifactService.areAllRequiredArtifactsDownloaded(userId, levelId);
+      const artifactsProgress = await artifactService.calculateLevelArtifactsProgress(userId, levelId);
+      
+      // Общий процент выполнения
+      const overallProgress = progressService.calculateOverallLevelCompletion(
+        videoProgress,
+        testScore,
+        artifactsProgress
+      );
+      
+      // Уровень считается выполненным, если выполнены все условия
+      const isCompleted = videosCompleted && testsPassed && artifactsDownloaded;
+      
+      return {
+        videosCompleted,
+        testsPassed,
+        artifactsDownloaded,
+        isCompleted,
+        videoProgress,
+        testScore,
+        artifactsProgress,
+        overallProgress
+      };
+    } catch (error) {
+      console.error('Error checking level completion conditions:', error);
+      // В случае ошибки возвращаем дефолтные значения
+      return {
+        videosCompleted: false,
+        testsPassed: false,
+        artifactsDownloaded: false,
+        isCompleted: false,
+        videoProgress: 0,
+        testScore: null,
+        artifactsProgress: 0,
+        overallProgress: 0
+      };
+    }
+  },
+  
+  /**
+   * Рассчитывает общий процент выполнения уровня
+   * @param videoProgress Процент просмотра видео
+   * @param testScore Результат тестов
+   * @param artifactsProgress Процент скачанных артефактов
+   * @returns Общий процент выполнения уровня
+   */
+  calculateOverallLevelCompletion: (
+    videoProgress: number,
+    testScore: number | null,
+    artifactsProgress: number
+  ): number => {
+    // Если тесты не пройдены, считаем их как 0
+    const normalizedTestScore = testScore || 0;
+    
+    // Весовые коэффициенты для компонентов
+    const videoWeight = 0.6; // 60%
+    const testWeight = 0.3; // 30%
+    const artifactsWeight = 0.1; // 10%
+    
+    // Рассчитываем общий прогресс с учетом весов
+    const overallProgress = 
+      (videoProgress * videoWeight) + 
+      (normalizedTestScore * testWeight) + 
+      (artifactsProgress * artifactsWeight);
+    
+    return Math.round(overallProgress);
+  },
+  
+  /**
+   * Завершает уровень, если все условия выполнены
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @returns Объект с результатом операции и статусом уровня
+   */
+  completeLevelIfConditionsMet: async (userId: string, levelId: string) => {
+    try {
+      // Проверяем условия завершения уровня
+      const conditions = await progressService.checkLevelCompletionConditions(userId, levelId);
+      
+      if (!conditions.isCompleted) {
+        return {
+          success: false,
+          status: 'in_progress' as ProgressStatus,
+          message: 'Не все условия для завершения уровня выполнены',
+          conditions
+        };
+      }
+      
+      // Обновляем прогресс пользователя
+      await progressService.updateLevelProgress(
+        userId,
+        levelId,
+        'completed',
+        100,
+        conditions.testScore
+      );
+      
+      // Разблокируем следующий уровень если он существует
+      const nextLevelInfo = await progressService.unlockNextLevel(userId, levelId);
+      
+      return {
+        success: true,
+        status: 'completed' as ProgressStatus,
+        message: 'Уровень успешно завершен',
+        conditions,
+        nextLevel: nextLevelInfo
+      };
+    } catch (error) {
+      console.error(`Error completing level ${levelId}:`, error);
+      throw new Error(`Failed to complete level: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+  
+  /**
+   * Получает следующий уровень после указанного
+   * @param levelId ID текущего уровня
+   * @returns Информация о следующем уровне или null, если следующего уровня нет
+   */
+  getNextLevel: async (levelId: string) => {
+    try {
+      const levelService = (await import('@/lib/services/levelService')).levelService;
+      
+      // Получаем текущий уровень
+      const currentLevel = await levelService.getLevelById(levelId);
+      
+      if (!currentLevel) {
+        return null;
+      }
+      
+      // Получаем все уровни
+      const allLevels = await levelService.getAllLevels();
+      
+      // Находим следующий уровень по порядковому номеру
+      const nextLevel = allLevels.find(level => 
+        level.order_index === currentLevel.order_index + 1 && 
+        level.status === 'published'
+      );
+      
+      return nextLevel || null;
+    } catch (error) {
+      console.error(`Error getting next level for level ${levelId}:`, error);
+      return null; // Возвращаем null в случае ошибки
+    }
+  },
+  
+  /**
+   * Разблокирует следующий уровень после успешного завершения текущего
+   * @param userId ID пользователя
+   * @param currentLevelId ID текущего уровня
+   * @returns Информация о разблокированном уровне или null, если следующего уровня нет
+   */
+  unlockNextLevel: async (userId: string, currentLevelId: string) => {
+    try {
+      // Получаем следующий уровень
+      const nextLevel = await progressService.getNextLevel(currentLevelId);
+      
+      if (!nextLevel) {
+        return null; // Следующего уровня нет
+      }
+      
+      // Проверяем, есть ли уже запись о прогрессе для следующего уровня
+      const existingProgress = await progressService.getUserLevelProgress(userId, nextLevel.id);
+      
+      // Если записи нет, создаем её со статусом "доступен"
+      if (!existingProgress) {
+        await progressService.updateLevelProgress(
+          userId,
+          nextLevel.id,
+          'in_progress', // Устанавливаем статус "в процессе"
+          0, // Начальный прогресс 0%
+          null // Тесты еще не пройдены
+        );
+      }
+      
+      return {
+        id: nextLevel.id,
+        title: nextLevel.title,
+        order_index: nextLevel.order_index,
+        is_free: nextLevel.is_free
+      };
+    } catch (error) {
+      console.error(`Error unlocking next level after level ${currentLevelId}:`, error);
+      return null; // Возвращаем null в случае ошибки для предотвращения сбоев в UI
+    }
+  },
+  
+  /**
+   * Проверяет, разблокирован ли уровень для пользователя
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @returns true, если уровень разблокирован
+   */
+  isLevelUnlocked: async (userId: string, levelId: string): Promise<boolean> => {
+    try {
+      const levelService = (await import('@/lib/services/levelService')).levelService;
+      
+      // Получаем уровень
+      const level = await levelService.getLevelById(levelId);
+      
+      if (!level) {
+        return false; // Уровень не существует
+      }
+      
+      // Если это первый уровень, он всегда разблокирован
+      if (level.order_index === 1) {
+        return true;
+      }
+      
+      // Получаем все уровни и прогресс пользователя
+      const allLevels = await levelService.getAllLevels();
+      const userProgress = await progressService.getUserProgress(userId);
+      
+      // Вычисляем статус уровня
+      const status = progressService.calculateLevelStatus(
+        level.order_index,
+        userProgress,
+        allLevels
+      );
+      
+      // Уровень разблокирован, если его статус не "locked"
+      return status !== 'locked';
+    } catch (error) {
+      console.error(`Error checking if level ${levelId} is unlocked for user ${userId}:`, error);
+      return false; // В случае ошибки считаем уровень заблокированным для безопасности
     }
   }
 }; 

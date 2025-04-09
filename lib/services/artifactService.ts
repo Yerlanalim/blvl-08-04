@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { createServerSupabaseClient, createBrowserSupabaseClient } from '@/lib/supabase/client';
 import { cache } from 'react';
 import { Artifact, UserArtifact, UserArtifactInsert } from '@/lib/supabase/types';
 
@@ -76,19 +76,15 @@ class ArtifactService {
   getUserLevelArtifacts = cache(async (userId: string, levelId: string): Promise<UserArtifact[]> => {
     const supabase = createServerSupabaseClient();
     
-    // Оптимизированный запрос с использованием join вместо множественных запросов
     const { data, error } = await supabase
       .from('user_artifacts')
-      .select(`
-        *,
-        artifact:artifacts(*)
-      `)
+      .select('*, artifacts(level_id)')
       .eq('user_id', userId)
-      .eq('artifact.level_id', levelId);
-    
+      .eq('artifacts.level_id', levelId);
+      
     if (error) {
-      console.error('Error fetching user level artifacts:', error);
-      return [];
+      console.error(`Error fetching user artifacts for level ${levelId}:`, error);
+      throw new Error(`Failed to fetch user artifacts for level ${levelId}`);
     }
     
     return data || [];
@@ -259,6 +255,64 @@ class ArtifactService {
       return { total: 0, byLevel: {} };
     }
   });
+
+  /**
+   * Проверяет, скачаны ли все обязательные артефакты уровня
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @returns true, если все обязательные артефакты скачаны
+   */
+  areAllRequiredArtifactsDownloaded = async (userId: string, levelId: string): Promise<boolean> => {
+    // Получаем все артефакты уровня
+    const allArtifacts = await this.getLevelArtifacts(levelId);
+    
+    // Отфильтровываем только обязательные артефакты
+    const requiredArtifacts = allArtifacts.filter(artifact => artifact.is_required);
+    
+    if (requiredArtifacts.length === 0) {
+      return true; // Нет обязательных артефактов, условие выполнено автоматически
+    }
+    
+    // Получаем артефакты, которые пользователь уже скачал
+    const downloadedArtifacts = await this.getUserLevelArtifacts(userId, levelId);
+    
+    // Проверяем, что каждый обязательный артефакт скачан
+    for (const requiredArtifact of requiredArtifacts) {
+      const isDownloaded = downloadedArtifacts.some(
+        downloaded => downloaded.artifact_id === requiredArtifact.id
+      );
+      
+      if (!isDownloaded) {
+        return false; // Найден необязательный артефакт, который не скачан
+      }
+    }
+    
+    return true; // Все обязательные артефакты скачаны
+  };
+  
+  /**
+   * Вычисляет прогресс скачивания артефактов уровня
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @returns Процент скачанных артефактов
+   */
+  calculateLevelArtifactsProgress = async (userId: string, levelId: string): Promise<number> => {
+    // Получаем все артефакты уровня
+    const allArtifacts = await this.getLevelArtifacts(levelId);
+    
+    if (allArtifacts.length === 0) {
+      return 0; // Нет артефактов в уровне
+    }
+    
+    // Получаем скачанные артефакты
+    const downloadedArtifacts = await this.getUserLevelArtifacts(userId, levelId);
+    
+    // Считаем количество скачанных артефактов
+    const downloadedCount = downloadedArtifacts.length;
+    
+    // Вычисляем процент скачанных артефактов
+    return Math.round((downloadedCount / allArtifacts.length) * 100);
+  }
 }
 
 export const artifactService = new ArtifactService(); 

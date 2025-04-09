@@ -156,5 +156,69 @@ export const testService = {
         throw new Error(`Failed to create quiz result`);
       }
     }
+  },
+  
+  /**
+   * Сохраняет результаты теста пользователя
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @param score Результат теста (процент правильных ответов)
+   * @returns Обновленная запись о прогрессе
+   */
+  saveTestResults: async (userId: string, levelId: string, score: number) => {
+    // Импортируем прогресс сервис динамически, чтобы избежать циклических зависимостей
+    const progressService = (await import('@/lib/services/progressService')).progressService;
+    
+    // Получаем текущий прогресс пользователя
+    const currentProgress = await progressService.getUserLevelProgress(userId, levelId);
+    
+    // Определяем статус прогресса
+    let status = currentProgress?.status || 'in_progress';
+    
+    // Если тест пройден успешно (>= 70%), но статус не "completed"
+    if (score >= 70 && status !== 'completed') {
+      status = 'in_progress';
+    }
+    
+    // Обновляем процент выполнения уровня
+    let completedPercentage = currentProgress?.completed_percentage || 0;
+    
+    // Обновляем запись о прогрессе
+    return progressService.updateLevelProgress(
+      userId,
+      levelId,
+      status,
+      completedPercentage,
+      score
+    );
+  },
+  
+  /**
+   * Проверяет, успешно ли пройдены тесты уровня (минимум 70% правильных ответов)
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @returns true, если тесты пройдены успешно
+   */
+  hasPassedLevelTests: async (userId: string, levelId: string): Promise<boolean> => {
+    const score = await testService.getLevelTestScore(userId, levelId);
+    
+    // Проверяем, что результат теста выше порогового значения (70%)
+    return score !== null && score >= 70;
+  },
+  
+  /**
+   * Получает результат теста пользователя для уровня
+   * @param userId ID пользователя
+   * @param levelId ID уровня
+   * @returns Результат теста или null, если тест не пройден
+   */
+  getLevelTestScore: async (userId: string, levelId: string): Promise<number | null> => {
+    const progressService = (await import('@/lib/services/progressService')).progressService;
+    
+    // Получаем прогресс пользователя
+    const progress = await progressService.getUserLevelProgress(userId, levelId);
+    
+    // Возвращаем результат теста или null, если он отсутствует
+    return progress?.quiz_score || null;
   }
 }; 

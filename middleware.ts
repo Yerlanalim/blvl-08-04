@@ -25,9 +25,9 @@ export async function middleware(request: NextRequest) {
     
     // Paths that redirect to dashboard if already authenticated
     const publicOnlyPaths = [
-      '/auth/login',
-      '/auth/register',
-      '/auth/forgot-password',
+      '/login',
+      '/register',
+      '/forgot-password',
     ]
     
     // Check for a specific redirect parameter to handle post-authentication redirects
@@ -37,7 +37,7 @@ export async function middleware(request: NextRequest) {
     if (authRequiredPaths.some(p => path.startsWith(p)) && !session) {
       // Store the original URL to redirect back after login
       const returnToPath = encodeURIComponent(request.nextUrl.pathname)
-      return NextResponse.redirect(new URL(`/auth/login?redirectTo=${returnToPath}`, request.url))
+      return NextResponse.redirect(new URL(`/login?redirectTo=${returnToPath}`, request.url))
     }
     
     // If the path is for non-authenticated users and user is authenticated
@@ -46,8 +46,8 @@ export async function middleware(request: NextRequest) {
     }
     
     // Special handling for update-password page - must have a session
-    if (path === '/auth/update-password' && !session) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+    if (path === '/update-password' && !session) {
+      return NextResponse.redirect(new URL('/login', request.url))
     }
     
     return response
@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
     // but only for protected routes to avoid redirect loops
     if (request.nextUrl.pathname.startsWith('/dashboard') || 
         request.nextUrl.pathname.startsWith('/admin')) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+      return NextResponse.redirect(new URL('/login', request.url))
     }
     return response
   }
@@ -71,9 +71,9 @@ export const config = {
     '/profile/:path*',
     
     // Auth routes
-    '/auth/login',
-    '/auth/register',
-    '/auth/forgot-password',
-    '/auth/update-password',
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/update-password',
   ],
 } 
